@@ -3,22 +3,16 @@ setwd("/Users/siteng/Documents/GitHub/SanJieKe-R-project")
 #设置正确的文档读取路径
 hpData<- read.csv("房价数据.csv", fileEncoding = "GBK") 
 #hpData表示house price data房价数据
-summary(hpData)
-str(hpData)
-#从宏观看数据结构及类型
 
 #2.数据清洗:
 hpData$价格.万元. <- as.numeric(hpData$价格.万元.)
 hpData$面积.平米. <- as.numeric(hpData$面积.平米.)
-class(hpData$价格.万元.)
-class(hpData$面积.平米.)
 #将“价格（万元）”、“面积（平米）”变量变为数值型
 library(dplyr)
 newhpData <- hpData%>%
 mutate(单价=价格.万元./面积.平米.)%>% 
 #使用dplyr包创建新变量“单价”
 arrange(挂牌时间)
-head(newhpData)
 #按照“挂牌时间”升序排序
 
 #异常值处理：

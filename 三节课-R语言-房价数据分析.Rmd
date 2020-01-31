@@ -14,68 +14,86 @@ knitr::opts_chunk$set
 # 三节课R语言数据分析练习
 三节课提供了相关的房价数据，我们可以利用R语言对其进行**数据可视化**，对影响房价的因素进行更直观的分析。
 
-## 第一步：数据挖掘（数据获取）
+## 第一步：**数据挖掘**（数据获取）
 ``` {r eval=TRUE, results='hide'}
 setwd("/Users/siteng/Documents/GitHub/SanJieKe-R-project")
 #设置正确的文档读取路径
 hpData<- read.csv("房价数据.csv", fileEncoding = "GBK") 
 #hpData表示house price data房价数据
-summary(hpData) #此处不显示结果，但summary()函数可以概览整个房价的局势
 ```
-## 第二步：数据清洗
-* 首先可以概览下数据结构及类型
-```{r eval=TRUE}
+## 第二步：**数据清洗**
+### 首先我们可以通过head(), tail(), summary(), str()等概览数据的结构及类型
+```{r echo=FALSE}
 str(hpData)
 ```
-* 看看
+### 通过str()，我们发现房价数据中价格和面积的数据类型并非为**numeric**，这会导致添加单价至dataframe时无法计算
 ```{r}
 hpData$价格.万元. <- as.numeric(hpData$价格.万元.)
 hpData$面积.平米. <- as.numeric(hpData$面积.平米.)
-class(hpData$价格.万元.)
-class(hpData$面积.平米.)
 #将“价格（万元）”、“面积（平米）”变量变为数值型
+```
+```{r warning=FALSE, include=FALSE, results='hide'}
 library(dplyr)
+```
+### 使用dplyr包创建新变量“单价”
+```{r}
 newhpData <- hpData%>%
 mutate(单价=价格.万元./面积.平米.)%>% 
-#使用dplyr包创建新变量“单价”
 arrange(挂牌时间)
-head(newhpData)
 #按照“挂牌时间”升序排序
 ```
-* 异常值处理：
-IQR <- quantile(hpData$单价)[4]-quantile(hpData$单价)[2] #定义IQR
-extreme.lower.bound <- quantile(hpData$单价)[2]-3*IQR 
-extreme.upper.bound <- quantile(hpData$单价)[4]+3*IQR 
+### 再次使用str()检查处理后的dataframe
+```{r echo=FALSE}
+str(hpData)
+```
+### 进一步数据清洗（异常值处理）：
+```{r}
+IQR <- quantile(newhpData$单价)[4]-quantile(newhpData$单价)[2] #定义IQR
+extreme.lower.bound <- quantile(newhpData$单价)[2]-3*IQR 
+extreme.upper.bound <- quantile(newhpData$单价)[4]+3*IQR 
 #定义极度异常值的边界
-mild.lower.bound <- quantile(hpData$单价)[2]-1.5*IQR 
-mild.upper.bound <- quantile(hpData$单价)[4]+1.5*IQR 
+mild.lower.bound <- quantile(newhpData$单价)[2]-1.5*IQR 
+mild.upper.bound <- quantile(newhpData$单价)[4]+1.5*IQR 
 #定义轻度异常值的边界
-extreme.new.hpData <- hpData[hpData$单价<=extreme.upper.bound & hpData$单价 >= extreme.lower.bound,] 
-mild.new.hpData <- hpData[hpData$单价<=mild.upper.bound & hpData$单价 >= mild.lower.bound,] 
-hpData <- mild.new.hpData 
-#具体方法可参照：https://shimo.im/docs/EDIrOtdOpM4FGsBA/read
+extreme.new.hpData <- newhpData[newhpData$单价<=extreme.upper.bound & newhpData$单价 >= extreme.lower.bound,]  
+mild.new.hpData <- newhpData[newhpData$单价<=mild.upper.bound & newhpData$单价 >= mild.lower.bound,] 
+newhpData <- mild.new.hpData 
+#剔除轻度异常值和极度异常值
 ```
+异常值具体方法可参照：https://shimo.im/docs/EDIrOtdOpM4FGsBA/read
 
-```
-# 第三步：数据探索（数据可视化）:
+## 第三步：**数据探索**（数据可视化）:
+```{r message=FALSE, warning=FALSE, include=FALSE}
 library(ggplot2) 
-# 绘制箱型图展示不同楼型房屋单价的分布情况
+```
+利用ggplot2包对房价和各可能因素进行制图  
+
+### 绘制箱型图展示不同楼型房屋单价的分布情况  
+```{r echo=TRUE}
 g1 <- ggplot(newhpData,aes(楼型,单价)) 
 g1 + geom_boxplot() +
   # 改变坐标名称
   labs(x="楼型") +
   labs(y="单价（万元）") +
   # 修改题目名称
-  labs(title="不同楼型房屋单价的分布情况")
+  labs(title="不同楼型房屋单价的分布情况")+
+  theme_bw(base_family = "Avenir",base_size = 10) +
+  theme(text=element_text(family="STKaiti",size=12))
+```
 
-# 通过散点图展示房屋单价与其他变量之间的关系
-# 单价与面积
+#### 分析与结论：  
+1. 从整体来说，板楼的单价<板塔结合的单价<塔楼的单价，单其中**塔楼**的单价数据少，存在异常情况，不具参考性；  
+2. **板楼**的每平方米的单价区间较大，最低在1.8万元/平米，最高3.2万元/平米；**板塔结合型**单价较稳定。  
+
+### 通过散点图展示房屋单价与其他变量之间的关系（单价与面积）
+```{r echo=TRUE}
 g2 <- ggplot(newhpData,aes(单价,面积.平米.))  
 g2+geom_point(alpha=1/3)+ 
   # 用线性回归拟合数据，颜色为steelblue 
   geom_smooth(method="lm",col="steelblue") + 
   # 个性化设置
-  theme_minimal(base_family = "Avenir",base_size = 10) + 
+  theme_bw(base_family = "Avenir",base_size = 10) +
+  theme(text=element_text(family="STKaiti",size=12)) + 
   # 横坐标为“单价” 
   labs(x="单价") +  
   # 纵坐标为“面积” 
@@ -83,14 +101,20 @@ g2+geom_point(alpha=1/3)+
   # 设置标题 
   labs(title="房屋单价与面积关系") 
 ```
-```
-# 挂牌时间和单价之间的关系
+
+#### 分析与结论：  
+1. **100平米以下**的房屋，单价集中在2万/㎡至3万/㎡之间，每平方米的房价很高；  
+2. **200平方以下**的房屋面积是占据大量市场；  
+3. **500平米以上**的房屋单价价格在3万元以上，属于个例，不具参考性。
+### 挂牌时间和单价之间的关系
+```{r echo=TRUE}
 g3 <- ggplot(newhpData,aes(单价,挂牌时间))  
 g3 + geom_point(alpha=1/3)+ 
   # 用线性回归拟合数据，颜色为steelblue 
   geom_smooth(method="lm",col="steelblue") + 
   # 个性化设置
-  theme_minimal(base_family = "Avenir",base_size = 10) + 
+  theme_bw(base_family = "Avenir",base_size = 10) +
+  theme(text=element_text(family="STKaiti",size=12)) + 
   # 横坐标为“单价” 
   labs(x="单价") +  
   # 纵坐标为“面积” 
@@ -98,23 +122,29 @@ g3 + geom_point(alpha=1/3)+
   # 设置标题 
   labs(title="房屋单价与挂牌时间关系") 
 ```
-```
-# 朝向等的关系:
+
+#### 分析与结论：  
+1. 房屋单价与挂牌时间不具线性相关性，即房屋单价与挂牌时间的早晚没有直接的关系;  
+2. 2016年房屋的单价在**2.8万至3万**区间，高房价，房价上涨;  
+3. 2017年房屋的单价在**2.2万至3万**区间，高房价，房价上涨;  
+4. 2018年和2019年房屋的单价分布均匀，在1.8万-3万区间，房价有所回落。  
+### 朝向等的关系:
+```{r echo=TRUE}
 g4 <- ggplot(newhpData,aes(朝向,单价))  
 g4 + geom_point(alpha=1/3)+ 
   # 用线性回归拟合数据，颜色为steelblue 
   geom_smooth(method="lm",col="steelblue") + 
   # 个性化设置
-  theme_minimal(base_family = "Arial",base_size = 10) + 
+  theme_bw(base_family = "Avenir",base_size = 10) +
+  theme(text=element_text(family="STKaiti",size=12)) + 
   # 横坐标为“单价” 
   labs(x="朝向") +  
   # 纵坐标为“面积” 
   labs(y="单价") + 
   # 设置标题 
   labs(title="房屋单价与朝向关系") 
-```  
-  
-  分析：
+```    
 
-板楼的单价 < 板塔结合的单价 < 塔楼的单价，其中塔楼的单价数据少，存在异常情况，不具参考性
-板楼的每平方米的单价区间较大，最低在1.8万元/平米，最高3.2万元/平米；板塔结合型单价平稳
+#### 分析与结论：  
+1. 中国房屋设计绝大部分遵循**坐北朝南**设计，朝南和南北朝向占据绝大多数，其中朝南方向更受设计和买房者的喜欢；  
+2. 房屋的朝向和房价没有直接关系。
